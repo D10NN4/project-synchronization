@@ -1,68 +1,65 @@
-#include  <stdio.h>
-#include  <stdlib.h>
-#include  <sys/types.h>
-#include  <sys/ipc.h>
-#include  <sys/shm.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <sys/wait.h>
+#include <semaphore.h>
+#include <fcntl.h>
 #include <time.h>
 
-void  DearOldDad(int ShmPTR[]);
-void  PoorStudent(int ShmPTR[]);
+void  DearOldDad(int *BankAccount, sem_t *mutex);
+void  PoorStudent(int *BankAccount, sem_t *mutex);
 
 int  main(int  argc, char *argv[]){
-     int    ShmID;
-     int    *ShmPTR;
-     pid_t  pid;
-     int    status;
+     int ShmID;
+     int *BankAccount;
+     sem_t *mutex;
 
-     //Random number generator
-     srand(time(NULL));
-
-
-     ShmID = shmget(IPC_PRIVATE, 2 * sizeof(int), IPC_CREAT | 0666);
+     //1. Create Shared Memory for BankAccount
+     ShmID = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
      if (ShmID < 0) {
-          printf("*** shmget error (server) ***\n");
+          perror("*** shmget error ***");
           exit(1);
      }
-     printf("Server has received a shared memory of two integers...\n");
 
-     ShmPTR = (int *) shmat(ShmID, NULL, 0);
-     if (*ShmPTR == (int *) -1) {
-          printf("*** shmat error (server) ***\n");
+     BankAccount = (int *) shmat(ShmID, NULL, 0);
+     if (*BankAccount == -1) {
+          perror("*** shmat error ***");
           exit(1);
      }
-     printf("Server has attached the shared memory...\n");
 
-     ShmPTR[0] = 0;
-     ShmPTR[1] = 0;
+    //Initialize BankAccount to 0
+    *BankAccount = 0;
      
-     printf("Server has filled %d %d in shared memory...\n",
-            ShmPTR[0], ShmPTR[1]);
+    //2. Initialized Named semaphore
+    sem_unlink("/bank_mutex");
+    mutex = sem_open("/bank_mutex", 0_CREAT, 0644, 1);
+    if (mutex == SEM_FAILED){
+      perror("*** sem_open error ***")
+      exit(1);
+    }
 
-     printf("Server is about to fork a child process...\n");
+    //3. Fork Child Process
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("*** fork error ***");
+        exit(1);
+    } else if (pid == 0) {
+        PoorStudent(BankAccount, mutex);
+        exit(0);
+    } else {
+        //Parent Process
+        DearOldDad(BankAccount, mutex);
+        wait(NULL);
+    }
 
-     pid = fork();
-     if (pid < 0) {
-          printf("*** fork error (server) ***\n");
-          exit(1);
-     }
-     else if (pid == 0) {
-          PoorStudent(ShmPTR);
-          exit(0);
-     }
-     else {
-      DearOldDad(ShmPTR);
-      wait(&status);
-     
-      printf("Server has detected the completion of its child...\n");
-      shmdt((void *) ShmPTR);
-      printf("Server has detached its shared memory...\n");
-      shmctl(ShmID, IPC_RMID, NULL);
-      printf("Server has removed its shared memory...\n");
-      printf("Server exits...\n");
-      exit(0);
-     }
+    //Cleanup
+    shmdt((void *) BankAccount);
+    shmctl(ShmID, IPC_RMID, NULL);
+    sem_close(mutex);
+    sem_unlink("/bank_mutex")
 }
 
 void  DearOldDad(int  ShmPTR[]){

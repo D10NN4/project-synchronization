@@ -58,29 +58,77 @@ void CloseRestaurant(BENSCHILLIBOWL* bcb) {
     pthread_cond_destroy(&(bcb->can_add));
     pthread_cond_destroy(&(bcb->can_get));
     free(bcb);
-    
+
     printf("Restaurant is closed!\n");
 }
 
 /* add an order to the back of queue */
 int AddOrder(BENSCHILLIBOWL* bcb, Order* order) {
-    return -1;
+    pthread_mutex_lock(&(bcb->mutex));
+
+    // Wait if queue is full
+    while (IsFull(bcb)) {
+        pthread_cond_wait(&(bcb->can_add), &(bcb->mutex));
+    }
+
+    // Assign order details and add to back of queue
+    order->order_number = bcb->next_order_number++;
+    AddOrderToBack(&(bcb->orders), order);
+    bcb->current_size++;
+
+    // Signal cooks that an order is available
+    pthread_cond_signal(&(bcb->can_get));
+    pthread_mutex_unlock(&(bcb->mutex));
+
+    return order->order_number;
 }
 
 /* remove an order from the queue */
 Order *GetOrder(BENSCHILLIBOWL* bcb) {
-    return NULL;
+    pthread_mutex_lock(&(bcb->mutex));
+
+    // Wait while queue is empty AND more orders are expected
+    while (IsEmpty(bcb)) {
+        if (bcb->orders_handled >= bcb->expected_num_orders) {
+            pthread_mutex_unlock(&(bcb->mutex));
+            return NULL;
+        }
+        pthread_cond_wait(&(bcb->can_get), &(bcb->mutex));
+    }
+
+    // Pop the front order from the queue
+    Order *order = bcb->orders;
+    bcb->orders = bcb->orders->next;
+    bcb->current_size--;
+    bcb->orders_handled++;
+
+    // Signal waiting customers that space is free
+    pthread_cond_signal(&(bcb->can_add));
+    pthread_mutex_unlock(&(bcb->mutex));
+
+    return order;
 }
 
 // Optional helper functions (you can implement if you think they would be useful)
 bool IsEmpty(BENSCHILLIBOWL* bcb) {
-  return false;
+  return bcb->current_size == 0;
 }
 
 bool IsFull(BENSCHILLIBOWL* bcb) {
-  return false;
+  return bcb->current_size == bcb->max_size;
 }
 
 /* this methods adds order to rear of queue */
-void AddOrderToBack(Order **orders, Order *order) {}
+void AddOrderToBack(Order **orders, Order *order) {
+    if (*orders == NULL) {
+        *orders = order;
+    } else {
+        Order *curr = *orders;
+        while (curr->next != NULL) {
+            curr = curr->next;
+        }
+        curr->next = order;
+    }
+    order->next = NULL;
+}
 

@@ -99,33 +99,32 @@ void DearOldDad(int *BankAccount, sem_t *mutex) {
 
 
 //Child Process: Poor Student
-void  PoorStudent(int  ShmPTR[]){
-    int account;
-    int balance;
+void  PoorStudent(int *BankAccount, sem_t *mutex){
+    srandom(time(NULL) ^ getpid()); // Seed random generator uniquely per process
 
-    for (int i = 0; i < 25; i++) {
-     //sleep 0 to 5 sec
-     sleep(rand() % 6);
+    while (1) {
+        sleep(random() % 6); // Sleep 0 - 5 seconds
+        printf("Poor Student: Attempting to Check Balance\n");
 
-     //wait for turn
-     while (ShmPTR[1] != 1);
+        sem_wait(mutex); // Enter Critical Section
+        int localBalance = *BankAccount;
+        int randomNumber = random();
 
-     //copy bank account to local variable
-     account = ShmPTR[0];
+        if (randomNumber % 2 == 0) { // Even number: Attempt Withdraw
+            int need = random() % 51; // Need 0 - 50
+            printf("Poor Student needs $%d\n", need);
 
-     //Generate amount needed
-     balance = rand() % 51;
-     printf("Poor Student needs $%d\n", balance);
-
-     if (balance <= account){
-         account -= balance;
-         printf("Poor Student: Withdraws $%d / Balance = $%d\n", balance, account);
-        } else {
-         printf("Poor Student: Not Enough Cash ($%d)\n", account);
+            if (need <= localBalance) {
+                localBalance -= need;
+                *BankAccount = localBalance;
+                printf("Poor Student: Withdraws $%d / Balance = $%d\n", need, localBalance);
+            } else {
+                printf("Poor Student: Not Enough Cash ($%d)\n", localBalance);
+            }
+        } else { // Odd number: Just check balance
+            printf("Poor Student: Last Checking Balance = $%d\n", localBalance);
         }
 
-     //copy account to shared mem, yield turn to child
-     ShmPTR[0] = account;
-     ShmPTR[1] = 0;
+        sem_post(mutex); // Exit Critical Section
     }
 }

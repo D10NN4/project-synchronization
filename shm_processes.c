@@ -59,41 +59,46 @@ int  main(int  argc, char *argv[]){
     shmdt((void *) BankAccount);
     shmctl(ShmID, IPC_RMID, NULL);
     sem_close(mutex);
-    sem_unlink("/bank_mutex")
+    sem_unlink("/bank_mutex");
+
+    return 0;
 }
 
-void  DearOldDad(int  ShmPTR[]){
-    int account;
-    int balance;
+//Parent Process: Dear Old Dad
+void DearOldDad(int *BankAccount, sem_t *mutex) {
+    srandom(time(NULL) ^ getpid()); // Seed random number generator
 
-    for (int i = 0; i < 25; i++) {
-     //sleep 0 to 5 sec
-     sleep(rand() % 6);
+    while (1) {
+        sleep(random() % 6); // Sleep 0 - 5 seconds
+        printf("Dear Old Dad: Attempting to Check Balance\n");
 
-     //wait for turn
-     while (ShmPTR[1] != 0);
+        sem_wait(mutex); // Enter Critical Section
+        int localBalance = *BankAccount;
+        int randomNumber = random();
 
-     account = ShmPTR[0];
-
-     //Check account balance
-     if ( account <= 100){
-        balance = rand() % 101;
-        if (balance % 2 == 0){
-         account += balance;
-         printf("Dear old Dad: Deposits $%d / Balance = $%d\n", balance, account);
-        } else {
-         printf("Dear old Dad: Doesn't have any money to give\n");
+        if (randomNumber % 2 == 0) { // Even number: Deposit decision
+            if (localBalance < 100) {
+                int amount = random() % 101; // Deposit 0 - 100
+                if (amount % 2 == 0) {
+                    localBalance += amount;
+                    *BankAccount = localBalance;
+                    printf("Dear old Dad: Deposits $%d / Balance = $%d\n", amount, localBalance);
+                } else {
+                    printf("Dear old Dad: Doesn't have any money to give\n");
+                }
+            } else {
+                printf("Dear old Dad: Thinks Student has enough Cash ($%d)\n", localBalance);
+            }
+        } else { // Odd number: Just check balance
+            printf("Dear Old Dad: Last Checking Balance = $%d\n", localBalance);
         }
-     } else {
-      printf("Dear old Dad: Thinks Student has enough Cash ($%d)\n", account);
-     }
 
-     //copy account to shared mem, yield turn to child
-     ShmPTR[0] = account;
-     ShmPTR[1] = 1;
+        sem_post(mutex); // Exit Critical Section
     }
 }
 
+
+//Child Process: Poor Student
 void  PoorStudent(int  ShmPTR[]){
     int account;
     int balance;

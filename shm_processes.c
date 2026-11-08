@@ -35,9 +35,9 @@ int  main(int  argc, char *argv[]){
      
     //2. Initialized Named semaphore
     sem_unlink("/bank_mutex");
-    mutex = sem_open("/bank_mutex", 0_CREAT, 0644, 1);
+    mutex = sem_open("/bank_mutex", O_CREAT, 0644, 1);
     if (mutex == SEM_FAILED){
-      perror("*** sem_open error ***")
+      perror("*** sem_open error ***");
       exit(1);
     }
 

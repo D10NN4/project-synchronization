@@ -30,7 +30,7 @@ MenuItem PickRandomMenuItem() {
 /* Allocate memory for the Restaurant, then create the mutex and condition variables needed to instantiate the Restaurant */
 
 BENSCHILLIBOWL* OpenRestaurant(int max_size, int expected_num_orders) {
-    BENSCHILLIBOWL* bcb (BENSCHILLIBOWL*) malloc(sizeof(BENSCHILLIBOWL));
+    BENSCHILLIBOWL* bcb = (BENSCHILLIBOWL*) malloc(sizeof(BENSCHILLIBOWL));
     bcb->orders = NULL; 
     bcb->current_size = 0;
     bcb->max_size = max_size;
